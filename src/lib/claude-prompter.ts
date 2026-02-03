@@ -4,7 +4,7 @@ import { join } from "path";
 import { ParsedEntry, entriesToXml } from "./journal-tiers";
 import { BatchSummary, formatSummariesForPrompt } from "./haiku-summarizer";
 
-const MODEL = "claude-opus-4-5-20250514";
+const MODEL = "claude-opus-4-5";
 const MAX_OUTPUT_TOKENS = 16000;
 
 // Load prompts at module level
