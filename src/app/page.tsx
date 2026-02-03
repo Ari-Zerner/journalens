@@ -185,40 +185,46 @@ export default function Home() {
   }, []);
 
   const handleFileSelect = useCallback(
-    async (e: React.ChangeEvent<HTMLInputElement>) => {
+    (e: React.ChangeEvent<HTMLInputElement>) => {
       if (e.target.files?.[0]) {
-        const selectedFile = e.target.files[0];
-        setFile(selectedFile);
+        setFile(e.target.files[0]);
         setError(null);
         setJournalStats(null);
         setCostEstimate(null);
-        setAnalysisStatus("analyzing");
+        setAnalysisStatus("idle");
         setAnalysisError(null);
-
-        // Pre-analyze the file to show cost estimate
-        try {
-          const journalContent = await extractJournal(selectedFile);
-          const entries = parseJournalXml(journalContent);
-          const tiered = partitionIntoTiers(entries);
-          setJournalStats(tiered);
-
-          const estimate = estimateCost({
-            tier1Entries: tiered.tier1,
-            tier2Batches: tiered.tier2Batches,
-            tier3Batches: tiered.tier3Batches,
-          });
-          setCostEstimate(estimate);
-          setAnalysisStatus("done");
-        } catch (err) {
-          // File analysis failed, but we can still try to process it
-          console.error("Failed to pre-analyze file:", err);
-          setAnalysisStatus("error");
-          setAnalysisError(err instanceof Error ? err.message : "Failed to analyze file");
-        }
       }
     },
     []
   );
+
+  const handleAnalyze = useCallback(async () => {
+    if (!file) return;
+
+    setAnalysisStatus("analyzing");
+    setAnalysisError(null);
+    setJournalStats(null);
+    setCostEstimate(null);
+
+    try {
+      const journalContent = await extractJournal(file);
+      const entries = parseJournalXml(journalContent);
+      const tiered = partitionIntoTiers(entries);
+      setJournalStats(tiered);
+
+      const estimate = estimateCost({
+        tier1Entries: tiered.tier1,
+        tier2Batches: tiered.tier2Batches,
+        tier3Batches: tiered.tier3Batches,
+      });
+      setCostEstimate(estimate);
+      setAnalysisStatus("done");
+    } catch (err) {
+      console.error("Failed to analyze file:", err);
+      setAnalysisStatus("error");
+      setAnalysisError(err instanceof Error ? err.message : "Failed to analyze file");
+    }
+  }, [file]);
 
   const handleDownload = useCallback(() => {
     if (!report) return;
@@ -642,61 +648,101 @@ export default function Home() {
             </div>
           )}
 
-          {/* Cost estimate / Analysis status */}
-          {!isWorking && file && analysisStatus === "analyzing" && (
-            <div className="p-4 bg-neutral-50 dark:bg-neutral-800 rounded text-sm text-neutral-500 dark:text-neutral-400">
-              Analyzing journal...
-            </div>
-          )}
-          {!isWorking && file && analysisStatus === "error" && (
-            <div className="p-4 bg-neutral-50 dark:bg-neutral-800 rounded text-sm">
-              <p className="text-neutral-500 dark:text-neutral-400">Could not analyze journal structure</p>
-              {analysisError && (
-                <p className="text-xs text-red-500 dark:text-red-400 mt-1">{analysisError}</p>
-              )}
-            </div>
-          )}
-          {!isWorking && journalStats && costEstimate && (
-            <div className="p-4 bg-neutral-50 dark:bg-neutral-800 rounded text-sm">
-              <div className="flex justify-between items-start mb-2">
-                <span className="text-neutral-500 dark:text-neutral-400">Journal analysis</span>
-                <span className="font-medium text-neutral-700 dark:text-neutral-300">
-                  Est. {formatCost(costEstimate.totalCost)}
-                </span>
-              </div>
-              <div className="text-xs text-neutral-400 dark:text-neutral-500 space-y-1">
-                <p>{journalStats.stats.totalEntries} entries total</p>
-                {journalStats.stats.tier1Entries > 0 && (
-                  <p>{journalStats.stats.tier1Entries} recent (full text to Opus)</p>
-                )}
-                {journalStats.tier2Batches.length > 0 && (
-                  <p>{journalStats.tier2Batches.length} weekly batches ({journalStats.stats.tier2Entries} entries)</p>
-                )}
-                {journalStats.tier3Batches.length > 0 && (
-                  <p>{journalStats.tier3Batches.length} monthly batches ({journalStats.stats.tier3Entries} entries)</p>
-                )}
-                {costEstimate.cachedBatches > 0 && (
-                  <p className="text-green-600 dark:text-green-500">
-                    {costEstimate.cachedBatches} batches cached (no Haiku cost)
-                  </p>
-                )}
-              </div>
+          {/* Step 1: Analyze button (before analysis) */}
+          {!isWorking && file && analysisStatus === "idle" && (
+            <div className="space-y-3">
+              <button
+                onClick={handleAnalyze}
+                disabled={!file}
+                className="w-full py-3 rounded font-sans text-sm transition-colors border border-neutral-300 dark:border-neutral-600 hover:bg-neutral-50 dark:hover:bg-neutral-800"
+              >
+                Analyze journal
+              </button>
+              <p className="text-xs text-neutral-400 dark:text-neutral-500 text-center">
+                See estimated Claude API cost before generating
+              </p>
             </div>
           )}
 
-          {/* Submit button */}
-          {!isWorking && (
+          {/* Analysis in progress */}
+          {!isWorking && file && analysisStatus === "analyzing" && (
+            <div className="p-4 bg-neutral-50 dark:bg-neutral-800 rounded text-sm text-neutral-500 dark:text-neutral-400 text-center">
+              Analyzing journal structure...
+            </div>
+          )}
+
+          {/* Analysis error */}
+          {!isWorking && file && analysisStatus === "error" && (
+            <div className="space-y-3">
+              <div className="p-4 bg-neutral-50 dark:bg-neutral-800 rounded text-sm">
+                <p className="text-neutral-500 dark:text-neutral-400">Could not analyze journal structure</p>
+                {analysisError && (
+                  <p className="text-xs text-red-500 dark:text-red-400 mt-1">{analysisError}</p>
+                )}
+              </div>
+              <button
+                onClick={handleAnalyze}
+                className="w-full py-3 rounded font-sans text-sm transition-colors border border-neutral-300 dark:border-neutral-600 hover:bg-neutral-50 dark:hover:bg-neutral-800"
+              >
+                Try again
+              </button>
+            </div>
+          )}
+
+          {/* Step 2: Cost estimate and Generate button (after analysis) */}
+          {!isWorking && journalStats && costEstimate && (
+            <div className="space-y-4">
+              <div className="p-4 bg-neutral-50 dark:bg-neutral-800 rounded text-sm">
+                <div className="flex justify-between items-start mb-2">
+                  <span className="text-neutral-500 dark:text-neutral-400">Estimated Claude API cost</span>
+                  <span className="font-medium text-neutral-700 dark:text-neutral-300">
+                    {formatCost(costEstimate.totalCost)}
+                  </span>
+                </div>
+                <div className="text-xs text-neutral-400 dark:text-neutral-500 space-y-1">
+                  <p>{journalStats.stats.totalEntries} entries total</p>
+                  {journalStats.stats.tier1Entries > 0 && (
+                    <p>{journalStats.stats.tier1Entries} recent (full text to Opus)</p>
+                  )}
+                  {journalStats.tier2Batches.length > 0 && (
+                    <p>{journalStats.tier2Batches.length} weekly batches ({journalStats.stats.tier2Entries} entries)</p>
+                  )}
+                  {journalStats.tier3Batches.length > 0 && (
+                    <p>{journalStats.tier3Batches.length} monthly batches ({journalStats.stats.tier3Entries} entries)</p>
+                  )}
+                  {costEstimate.cachedBatches > 0 && (
+                    <p className="text-green-600 dark:text-green-500">
+                      {costEstimate.cachedBatches} batches cached (no Haiku cost)
+                    </p>
+                  )}
+                </div>
+                <p className="text-xs text-neutral-400 dark:text-neutral-500 mt-3 pt-3 border-t border-neutral-200 dark:border-neutral-700">
+                  This is billed to your Claude API key, not a separate charge.
+                </p>
+              </div>
+
+              <button
+                onClick={handleSubmit}
+                disabled={!isReady}
+                className={`
+                  w-full py-3 rounded font-sans text-sm transition-colors
+                  ${
+                    isReady
+                      ? "bg-neutral-800 dark:bg-neutral-200 text-white dark:text-neutral-900 hover:bg-neutral-700 dark:hover:bg-neutral-300"
+                      : "bg-neutral-100 dark:bg-neutral-800 text-neutral-400 dark:text-neutral-500 cursor-not-allowed"
+                  }
+                `}
+              >
+                Generate insights
+              </button>
+            </div>
+          )}
+
+          {/* Generate button when no file selected yet */}
+          {!isWorking && !file && (
             <button
-              onClick={handleSubmit}
-              disabled={!isReady}
-              className={`
-                w-full py-3 rounded font-sans text-sm transition-colors
-                ${
-                  isReady
-                    ? "bg-neutral-800 dark:bg-neutral-200 text-white dark:text-neutral-900 hover:bg-neutral-700 dark:hover:bg-neutral-300"
-                    : "bg-neutral-100 dark:bg-neutral-800 text-neutral-400 dark:text-neutral-500 cursor-not-allowed"
-                }
-              `}
+              disabled
+              className="w-full py-3 rounded font-sans text-sm transition-colors bg-neutral-100 dark:bg-neutral-800 text-neutral-400 dark:text-neutral-500 cursor-not-allowed"
             >
               Generate insights
             </button>
