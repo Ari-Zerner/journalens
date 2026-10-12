@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "deny": [
+      "WebFetch",
+      "WebSearch",
+      "mcp__claude_ai_Gmail",
+      "mcp__claude_ai_Google_Drive",
+      "mcp__claude_ai_Google_Calendar",
+      "mcp__claude_ai_Claude_Docs",
+      "Artifact"
+    ]
+  }
+}

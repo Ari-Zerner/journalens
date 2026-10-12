@@ -1,34 +1,64 @@
 # JournaLens
 
-A web app that analyzes your journal entries and provides thoughtful insights using Claude AI.
+Thoughtful insights from your journal, written by [Claude Code](https://claude.com/claude-code).
 
-**Try it at [journalens.vercel.app](https://journalens.vercel.app)**
+A script turns your journal export into tiered files, then starts a headless Claude Code
+in a private workspace to read them and write an advice report. There is no API key and
+nothing to install beyond Python 3 and a signed-in Claude Code.
 
-## Features
+## Usage
 
-- **Journal Analysis** - Upload your journal export and receive AI-generated insights about patterns, themes, and reflections
-- **Multiple Formats** - Supports Day One exports (.zip) as well as plain text files (.json, .xml, .md, .txt)
-- **Private by Design** - Your journal content is processed directly with the Claude API using your own API key
-- **Cloud Sync** - Sign in with Google to save your API key and reports privately in your Google Drive
+```
+python3 journalens.py extract MyJournal.zip
+python3 journalens.py report --topics "should I take the project lead role?"
+```
 
-## How It Works
+`extract` accepts Day One exports (`.zip` or `.json`), which are split by date, and plain
+text (`.md`, `.txt`), which is read as one undated block. Each export is a full snapshot
+that replaces the last. `report` prints the path of the finished report.
 
-1. Enter your [Claude API key](https://console.anthropic.com/settings/keys)
-2. Upload a journal file
-3. Wait for Claude to analyze your entries
-4. Review your personalized insights report
+## Talking with your journal
+
+The workspace is also a place to open Claude Code and ask questions: `python3
+journalens.py init` prints its path. Sessions there get instructions for conversing
+about the journal (`analyst/CLAUDE.md`) and have web and connector tools removed.
+
+## How it works
+
+Entries are sorted into tiers by age: the last two weeks or so in full, then one file per
+week back to about 90 days, then one file per month. The analyst reads the recent entries
+directly and writes a summary of each older file, which it reuses on later runs until
+that file changes. Each report also draws on the previous reports and on a context file
+of standing facts that the analyst keeps up to date from your journal.
+
+The analyst's instructions are `analyst/CLAUDE.md`. It runs with file tools only,
+confined to the workspace: no shell, no web access, no connectors.
 
 ## Privacy
 
-- Journal content is sent directly to the Claude API and is not stored on any server
-- Your API key is stored only in your browser (or your Google Drive if signed in)
-- Reports are saved to your personal Google Drive, accessible only by you
+Your journal, the summaries, and the reports live in `$JOURNALENS_HOME` (default
+`~/.local/share/journalens`), not in this repo. They go to Claude through your own Claude
+Code login and nowhere else.
 
-## Development
+## Upload site (optional)
 
-```bash
-npm install
-npm run dev
+`web/` is a small site for doing the above from a phone: sign in with Google, upload the
+export, read the report. On a report you can answer its context questions and leave a
+note on any section; the next report reads them. The whole report, with your answers and
+notes in place, can be copied or shared into your journal app. Only one Google address is let in. The web process runs as an
+unprivileged user that cannot read the journal or Claude's credentials; it hands requests
+to a root-side runner through a spool directory.
+
+```
+sudo web/install.sh journal.example.com you@example.com
 ```
 
-Requires environment variables for NextAuth and Google OAuth configuration.
+That installs Caddy (for HTTPS), the services, and opens ports 80 and 443. Then point the
+hostname's DNS at the machine, create a Google OAuth client with the redirect URI
+`https://<hostname>/auth/callback`, and put its ID and secret in
+`/etc/journalens/web.env`.
+
+## Earlier version
+
+JournaLens began as a Next.js web app that called the Claude API with your own key. That
+version is preserved on the [`archive/web-app`](../../tree/archive/web-app) branch.
