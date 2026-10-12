@@ -1,9 +1,5 @@
-# Journal data lives outside the repo ($JOURNALENS_HOME); these are only a guard
-# against an export or a report being dropped here by hand.
-/exports/
-/journal/
-/reports/
-*.zip
-!/test-data/*.zip
+# Keep test data
+!test-data/
 
-__pycache__/
+# Auto-generated
+next-env.d.ts
